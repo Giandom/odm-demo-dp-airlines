@@ -1,0 +1,8 @@
+{
+    "azure": {
+      "tenant_id": "dfad9d7a-5e4b-452e-b4e7-7d458a5fc43c",
+      "region":"Germany West Central",
+      "subscription_id": "a175fd1d-07e6-408b-80bf-26d16747728c",
+      "resource_group_name": "quantyca-internal-giandomenico-avelluto"
+    }
+  }

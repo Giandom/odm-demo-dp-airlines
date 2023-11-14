@@ -1,0 +1,164 @@
+# Terraform pipeline, you need to install Azure Pipelines Terraform Tasks on Azure DevOps before you can run the pipeline
+
+trigger: none
+
+variables:
+  - group: Azure-Config
+  - name: tf_version
+    value: "latest" # what version of terraform should be used
+  - name: project
+    value: "odm-demo-airline"
+
+parameters:
+  - name: callbackRef
+    displayName: Callback Ref
+    type: string
+    default: 'default_callback_ref'
+  - name: callbackBaseURL
+    displayName: Callback Base URL
+    type: string
+    default: 'default_callback_base_url'
+
+pool:
+  vmImage: "ubuntu-latest"
+
+stages:
+  - stage: "runTerraform"
+    displayName: "Terraform Run"
+    jobs:
+      - job: "TerraformValidateAndPlan"
+        displayName: "Terraform Plan And Validate"
+        continueOnError: false
+        steps:
+          - task: TerraformTaskV4@4
+            displayName: Initialize Terraform
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              backendServiceArm: $(backendServiceArm)
+              backendAzureRmResourceGroupName: $(backendAzureRmResourceGroupName)
+              backendAzureRmStorageAccountName: $(backendAzureRmStorageAccountName)
+              backendAzureRmContainerName: $(backendAzureRmContainerName)
+              backendAzureRmKey: "airline-demo/azuredevops.terraform.tfstate"
+              workingDirectory: "./infrastructure"
+              commandOptions: -reconfigure
+
+          - task: TerraformTaskV4@4
+            name: terraformValidate
+            displayName: Validate Terraform Code
+            inputs:
+              provider: 'azurerm'
+              command: 'validate'
+              environmentServiceNameAzureRM: $(backendServiceArm)
+              workingDirectory: "./infrastructure"
+
+          - bash: |
+              mkdir ./infrastructure/planFolder
+            name: createPlanFolder
+
+          - task: TerraformTaskV4@4
+            name: terraformPlan
+            displayName: Create Terraform Plan
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              commandOptions: '-out=planFolder/terraform.tfplan'
+              environmentServiceNameAzureRM: $(backendServiceArm)
+              workingDirectory: "./infrastructure"
+
+          - publish: './infrastructure/planFolder'
+            displayName: 'Publish Terraform Plan file for later apply'
+            artifact: terraformPlan
+
+          - bash: |
+              echo Plan variable: $(terraformPlan.changesPresent)
+              echo "##vso[task.setvariable variable=changesPresentOutput;isoutput=true;]$(terraformPlan.changesPresent)"
+            name: changesPresent
+
+      - job: "TerraformApproval"
+        displayName: "Manual Approval"
+        continueOnError: false
+        dependsOn: TerraformValidateAndPlan
+        pool: server
+        variables:
+          changesPresentOutput: $[ dependencies.TerraformValidateAndPlan.outputs['changesPresent.changesPresentOutput'] ]
+        steps:
+          - task: ManualValidation@0
+            condition: eq(variables['changesPresentOutput'], 'true')
+            timeoutInMinutes: "1440" # task times out in 1 day
+            inputs:
+              notifyUsers: |
+                giandomenico.avelluto@quantyca.it
+              instructions: "Please review the output of Terraform plan before approving."
+              onTimeout: "reject"
+
+      - job: "TerraformApply"
+        displayName: "Terraform Apply"
+        continueOnError: false
+        dependsOn:
+          - TerraformApproval
+          - TerraformValidateAndPlan
+        variables:
+          changesPresentOutput: $[ dependencies.TerraformValidateAndPlan.outputs['changesPresent.changesPresentOutput'] ]
+        steps:
+          - download: current
+            artifact: terraformPlan
+
+          - bash: |
+              cp $(Pipeline.Workspace)/terraformPlan/terraform.tfplan ./infrastructure/terraform.tfplan
+            name: copyPlanFile
+
+          # Only runs if the 'terraformPlan' task has detected changes the in state.
+          - task: TerraformTaskV4@4
+            condition: eq(variables['changesPresentOutput'], 'true')
+            displayName: Initialize Terraform
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              backendServiceArm: $(backendServiceArm)
+              backendAzureRmResourceGroupName: $(backendAzureRmResourceGroupName)
+              backendAzureRmStorageAccountName: $(backendAzureRmStorageAccountName)
+              backendAzureRmContainerName: $(backendAzureRmContainerName)
+              backendAzureRmKey: "airline-demo/azuredevops.terraform.tfstate"
+              workingDirectory: "./infrastructure"
+              commandOptions: -reconfigure
+
+          - task: TerraformTaskV4@4
+            condition: eq(variables['changesPresentOutput'], 'true')
+            displayName: Apply Terraform Plan
+            inputs:
+              provider: 'azurerm'
+              command: 'apply'
+              commandOptions: 'terraform.tfplan'
+              environmentServiceNameAzureRM: $(backendServiceArm)
+              workingDirectory: "./infrastructure"
+
+  - stage: NotifyOpenDataMesh
+    displayName: Notify Open Data Mesh
+    condition: always()
+    jobs:
+      - job: NotifyOpenDataMesh
+        displayName: Notify Open Data Mesh
+        steps:
+          - task: Bash@3
+            displayName: Call Open Data Mesh API
+            continueOnError: false
+            inputs:
+              failOnStderr: true
+              targetType: 'inline'
+              script: |
+                callback_ref_url=${{ parameters.callbackRef }}
+                echo callback_ref_url is: "$callback_ref_url"
+                
+                task_stop_path=$(echo "$callback_ref_url" | sed 's/.*\/tasks\/\(.*\)/tasks\/\1/')
+                echo task_stop_path is: "$task_stop_path"
+                
+                callback_url=${{ parameters.callbackBaseURL }}/${task_stop_path}
+                echo callback_url is: $callback_url
+                
+                payload="{\"errors\": \"\", \"results\": {\"pipelineID\": \"$(Build.BuildNumber)\", \"pipelineName\": \"$(Build.DefinitionName)\"}, \"status\": \"$(Agent.JobStatus)\"}"
+                echo payload is $payload
+                
+                echo Calling ODM..
+                response=$(curl -X PATCH -H "Content-Type: application/json" "$callback_url" -d "$payload" -s)
+                echo "ODM callback response: $response"

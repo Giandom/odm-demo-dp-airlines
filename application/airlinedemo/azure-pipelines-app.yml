@@ -1,0 +1,95 @@
+trigger: none
+
+parameters:
+  - name: callbackRef
+    displayName: Callback Ref
+    type: string
+    default: 'default_callback_ref'
+  - name: callbackBaseURL
+    displayName: Callback Base URL
+    type: string
+    default: 'default_callback_base_url'
+
+stages:
+  - stage: build
+    jobs:
+      - job: run_build
+        pool:
+          vmImage: 'ubuntu-latest' # other options: 'macOS-latest', 'windows-latest'
+        steps:
+          # Build
+          - task: Maven@3
+            inputs:
+              mavenPomFile: './application/airlinedemo/pom.xml'
+              #mavenOptions: '-Xmx3072m'
+              #javaHomeOption: 'JDKVersion'
+              jdkVersionOption: '17'
+              #jdkArchitectureOption: 'x64'
+              #publishJUnitResults: true
+              #testResultsFiles: '**/TEST-*.xml'
+              goals: 'install'
+
+          # Deploy
+          ## Copy files or build artifacts to a remote machine over SSH
+          - task: CopyFilesOverSSH@0
+            inputs:
+              sshEndpoint: "odm-demo-airline"
+              sourceFolder: './application/airlinedemo/target' # Optional
+              contents: '*.jar'
+              targetFolder: "/home/airline" # Optional
+              #cleanTargetFolder: false # Optional
+              overwrite: true # Optional
+              #failOnEmptySource: false # Optional
+              #flattenFolders: false # Optional
+
+          - task: CopyFilesOverSSH@0
+            inputs:
+              sshEndpoint: "odm-demo-airline"
+              sourceFolder: './application/airlinedemo/src/main/resources/db/migration' # Optional
+              contents: '*.csv'
+              targetFolder: "/home/airline" # Optional
+              #cleanTargetFolder: false # Optional
+              overwrite: true # Optional
+              #failOnEmptySource: false # Optional
+              #flattenFolders: false # Optional
+
+          ## Run shell commands or a script on a remote machine using SSH
+          - task: SSH@0
+            inputs:
+              sshEndpoint: "odm-demo-airline"
+              runOptions: 'script' # Options: commands, script, inline
+              #commands: # Required when runOptions == Commands
+              scriptPath: "./application/airlinedemo/deployScript.sh" # Required when runOptions == Script
+              #inline: # Required when runOptions == Inline
+              #interpreterCommand: # Used when runOptions == Inline
+              #args: "/home/airline/deployScript.sh" # Optional
+              #failOnStdErr: true # Optional
+  - stage: NotifyOpenDataMesh
+    displayName: Notify Open Data Mesh
+    condition: always()
+    jobs:
+      - job: NotifyOpenDataMesh
+        displayName: Notify Open Data Mesh
+        steps:
+          - task: Bash@3
+            displayName: Call Open Data Mesh API
+            continueOnError: false
+            inputs:
+              failOnStderr: true
+              targetType: 'inline'
+              script: |
+                callback_ref_url=${{ parameters.callbackRef }}
+                echo callback_ref_url is: "$callback_ref_url"
+                
+                task_stop_path=$(echo "$callback_ref_url" | sed 's/.*\/tasks\/\(.*\)/tasks\/\1/')
+                echo task_stop_path is: "$task_stop_path"
+                
+                callback_url=${{ parameters.callbackBaseURL }}/${task_stop_path}
+                echo callback_url is: $callback_url
+                
+                payload="{\"errors\": \"\", \"results\": {\"pipelineID\": \"$(Build.BuildNumber)\", \"pipelineName\": \"$(Build.DefinitionName)\"}, \"status\": \"$(Agent.JobStatus)\"}"
+                echo payload is $payload
+                
+                echo Calling ODM..
+                response=$(curl -X PATCH -H "Content-Type: application/json" "$callback_url" -d "$payload" -s)
+                echo "ODM callback response: $response"

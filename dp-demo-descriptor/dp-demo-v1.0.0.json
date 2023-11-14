@@ -1,0 +1,65 @@
+{
+   "dataProductDescriptor": "1.0.0",
+   "info": {
+      "fullyQualifiedName": "urn:org.opendatamesh:dataproducts:airlinedemo:1",
+      "name": "airlinedemo",
+      "version": "1.0.0",
+      "domain": "Airline",
+      "owner": {
+         "id": "giandomenico.avelluto@quantyca.it"
+      }
+   },
+   "interfaceComponents": {
+      "outputPorts": []
+   },
+   "internalComponents": {
+      "lifecycleInfo": {
+         "provisionInfraDev": [
+            {
+               "service": {
+                  "$href": "azure-devops"
+               },
+               "template": {
+                  "specification": "spec",
+                  "specificationVersion": "2.0",
+                  "definition": {
+                     "organization": "[organizationName]",
+                     "project": "[projectName]",
+                     "pipelineId": "[pipelineID]",
+                     "branch": "master"
+                  }
+               },
+               "configurations": {
+                  "params": {
+                     "callbackBaseURL": "http://[IP]:8002/api/v1/pp/devops"
+                  },
+                  "stagesToSkip": []
+               }
+            }
+         ],
+         "deployAppDev": [
+            {
+               "service": {
+                  "$href": "azure-devops"
+               },
+               "template": {
+                  "specification": "spec",
+                  "specificationVersion": "2.0",
+                  "definition": {
+                     "organization": "[organizationName]",
+                     "project": "[projectName]",
+                     "pipelineId": "[pipelineID]",
+                     "branch": "master"
+                  }
+               },
+               "configurations": {
+                  "params": {
+                     "callbackBaseURL": "http://[IP]:8002/api/v1/pp/devops"
+                  },
+                  "stagesToSkip": []
+               }
+            }
+         ]
+      }
+   }
+}
