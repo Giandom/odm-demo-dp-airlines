@@ -31,7 +31,7 @@ Per effettuare il rilascio della ODM Platform, potete seguire questa procedura s
     * https://github.com/opendatamesh-initiative/odm-platform.git
 4. Ripetere lo step 3 per i seguenti repositories:
     * https://github.com/opendatamesh-initiative/odm-platform-up-services-executor-azuredevops.git
-    * TO-BE merged repo
+    * https://github.com/Giandom/odm-demo-dp-airlines.git
 5. Nella sezione dedicata alle pipeline (sempre nel menu a sinistra), cliccare su **Create Pipeline**.
     * La prima pipeline da creare è quella relativa al rilascio dell'infrastruttura sulla quale si appoggerà ODM Platform (la pipeline provisionerà una VM di tipo: Standard_A1_v2, 1CPU / 2GB RAM).
         * Nella sezione di connessione repository, scegliere quindi Azure Repo e selezionare il repository TBD
