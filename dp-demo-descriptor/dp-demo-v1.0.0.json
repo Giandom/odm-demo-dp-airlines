@@ -10,7 +10,16 @@
       }
    },
    "interfaceComponents": {
-      "outputPorts": []
+      "outputPorts": [
+         {
+            "description": "This port exposes the last known status of each trip operated in the last 12 months",
+            "$ref": "ports/dp-demo-v1.0.0-flight-freq-datastore-oport.json"
+        },
+        {
+            "description": "This port expose all modifications in the status of each trip as events",
+            "$ref": "ports/dp-demo-v1.0.0-flight-freq-api-oport.json"
+        }
+      ]
    },
    "internalComponents": {
       "lifecycleInfo": {
