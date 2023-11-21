@@ -1,12 +1,12 @@
 {
    "dataProductDescriptor": "1.0.0",
    "info": {
-      "fullyQualifiedName": "urn:org.opendatamesh:dataproducts:airlinedemo:1",
-      "name": "airlinedemo",
+      "fullyQualifiedName": "urn:org.opendatamesh:dataproducts:flightfrequency:1",
+      "name": "flightFrequency",
       "version": "1.0.0",
       "domain": "Airline",
       "owner": {
-         "id": "giandomenico.avelluto@quantyca.it"
+         "id": "john.smith@example.com"
       }
    },
    "interfaceComponents": {

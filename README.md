@@ -1,11 +1,45 @@
-# README #
+Open Data Mesh Demo
+==============
 
-In this demo, we are showcasing a Data Product consisting of two interfaces with their respective data contracts:
+Table of Contents
+=================
+
+* [Open Data Mesh Demo](#open-data-mesh-demo)
+* [Overview](#overview)
+* [Demo Requirements](#demo-requirements)
+* [Environment Setup](#environment-setup)
+   * [Create Azure DevOps Pipelines](#create-azure-devops-pipelines)
+   * [Register Service Connections](#register-service-connections)
+   * [Create Group Variables](#create-group-variables)
+* [ODM Platform Deployment](#odm-platform-deployment)
+   * [Run ODM Infrastructure Pipeline](#run-odm-infrastructure-pipeline)
+   * [Register service connection](#register-service-connection)
+   * [Run ODM Application Pipelines](#run-odm-application-pipelines)
+* [Airline Data Product - Registration Phase](#airline-data-product---registration-phase)
+   * [Configure the Data Product Lifecycle](#configure-the-data-product-lifecycle)
+   * [Register the Data Product](#register-the-data-product)
+* [Airline Data Product - Deployment Phase](#airline-data-product---deployment-phase)
+   * [Start Infrastructure Provisioning Activity](#start-infrastructure-provisioning-activity)
+   * [Start Application Deployment Activity](#start-application-deployment-activity)
+* [Test Data Product Interfaces](#test-data-product-interfaces)
+* [Cleanup](#cleanup)
+* [Who do I talk to?](#who-do-i-talk-to)
+
+<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
+
+# Overview
+In this demo, mostreremo come si può gestire il lifecycle di un Data Product sfruttando le funzionalità della piattaforma [Open Data Mesh](https://initiative.opendatamesh.org/).
+
+Nello specifico, we are showcasing a Data Product consisting of two interfaces with their respective data contracts:
 
 * SQL Interface: A JDBC connection is exposed to a MySQL database.
 * API REST Interface: An REST API is exposed for querying the data.
 
-## Demo Requirements ##
+Nella prima parte di questa demo si descrivono gli step necessari per effettuare il deploy della Open Data Mesh platform in ambiente Azure.
+La seconda parte descrive come effettuare la registrazione e il deploy di un Data Product di esempio.
+Infine è descritto come eliminare tutte le risorse create durante la demo.
+
+# Demo Requirements
  
  * Azure Subscription
  * Access to Azure DevOps
@@ -14,16 +48,12 @@ In this demo, we are showcasing a Data Product consisting of two interfaces with
  * Azure CLI installed
  * cURL or Postman installed
 
-## How do I get set up? ##
-
-### Summary of set up ###
-
+# Environment Setup
 The demo involves running the OpenDataMesh (aka ODM) Platform in the Azure environment, registering the Data Product contained in this demo repository, and finally, deploying it.
 
 
-#### Prerequisites ####
-
-To release the ODM Platform, you can follow this step-by-step procedure:
+## Create Azure DevOps Pipelines
+To deploy the ODM Platform, you'll need to set up specific Azure DevOps pipelines:
 
 1. Access Azure DevOps.
 2. If not already present, create a new project.
@@ -58,9 +88,11 @@ To release the ODM Platform, you can follow this step-by-step procedure:
         * In the Configure section, select the Existing Azure Pipelines YAML file option. Then choose **$master** as the branch and pass the following path: **application/airlinedemo/azure-pipelines-app.yml**.
         * Save the pipeline without executing it.
         * Change the name of the pipeline to **odm-demo-application**.
-6. Create an application in your Azure AD to manage the pipelines programmatically:
+
+## Register Service Connections
+1. Create an application in your Azure AD to manage the pipelines programmatically:
     * Follow the instructions in [thos document](https://github.com/opendatamesh-initiative/odm-platform-up-services-executor-azuredevops), in the section: **Azure Environment**.
-7. Return to Azure DevOps and create an Azure Resource Manager service connection.
+2. Return to Azure DevOps and create an Azure Resource Manager service connection.
     * Go to **Project Settings** (found at the bottom left of Azure DevOps).
     * In the left menu, click on **Service connections** under the Pipelines section.
     * Click on **New service connection**, in the top right, and select **Azure Resource Manager** as the type and **Workload Identity Federation** as the authentication method. Enter the following configurations:
@@ -69,7 +101,9 @@ To release the ODM Platform, you can follow this step-by-step procedure:
         * Resource Group: Select an existing resource group in Azure where resources will be provisioned.
         * Service connection name: Enter  **ODMServiceConnection**
         * Check the option: Grant access permission to all pipelines.
-8. Create the following variable groups in the Library section of Azure DevOps:
+
+## Create Group Variables
+1. Create the following variable groups in the Library section of Azure DevOps:
    * Create a variable group and name it: **ODM-Platform**
       * Add the following variables: 
         * GITHUB_USERNAME: Necessary for reading dependencies generated by the odm-platform project (even though the project is public, authentication is required).
@@ -87,40 +121,45 @@ To release the ODM Platform, you can follow this step-by-step procedure:
         * backendAzureRmContainerName: The name of the container to be used for saving the Terraform state (if you have just created the storage account, follow [this guide](https://learn.microsoft.com/en-us/azure/storage/blobs/blob-containers-portal))
       * Click on **Save**.
       * Click on **Pipeline permissions**, then on the three dots, and click on **Open access**.
-9. Modify the **config.json** file in the root of this repository to fill in the necessary configurations:
+2. Modify the **config.json** file in the root of this repository to fill in the necessary configurations:
     * **tenant_id**: Your Azure tenant ID.
     * **region**: The region in which your resources will be deployed (e.g., "Germany West Central").
     * **subscription_id**: The ID of your Azure subscription.
     * **resource_group_name**: The name of the Azure resource group in which you want to deploy resources.
 
 
-## ODM Platform deployment ##
+# ODM Platform Deployment
 With the environment prepared, we can deploy the components of the ODM Platform.
 
-1. Launch the **odm-platform-infrastructure** pipeline on Azure DevOps. 
-2. Once the execution is complete, view the details of the **Terraform Apply/Apply Terraform Plan** step and copy the IP found at the bottom of the execution log: **vm-public-endpoint**. 
-3. Create an SSH service connection.
-    * Go to the **Project Settings** page, located at the bottom left of Azure DevOps.
-    * In the left menu, click on **Service connections** under the **Pipelines** section.
-    * Click on **New service connection**, in the top right, and select SSH as the type. Enter the following values:
-        * Host name: Enter the IP you copied earlier.
-        * Port number: Leave the default, 22.
-        * Username: odm
-        * Password: 0p3nD@t@M3sh
-        * Service connection name: odm-platform.
-        * Check the option: Grant access permission to all pipelines.
-4. Save and return to the pipelines page. Now run the **odm-platform-application** pipeline.
-5. Finally, run the **odm-platform-executor-azdevops** pipeline.
+## Run ODM Infrastructure Pipeline
+Launch the **odm-platform-infrastructure** pipeline on Azure DevOps. 
+Once the execution is complete, view the details of the **Terraform Apply/Apply Terraform Plan** step and copy the IP found at the bottom of the execution log: **vm-public-endpoint**.
 
-At the end of the execution, if there were no errors, you should be able to reach the following endpoints, replacing the [IP] placeholder with the hostname used in step 3:
+## Register service connection
+Create an SSH service connection:
+   1. Go to the **Project Settings** page, located at the bottom left of Azure DevOps.
+   2. In the left menu, click on **Service connections** under the **Pipelines** section.
+   3. Click on **New service connection**, in the top right, and select SSH as the type. Enter the following values:
+      * Host name: Enter the IP you copied earlier.
+      * Port number: Leave the default, 22.
+      * Username: odm
+      * Password: 0p3nD@t@M3sh
+      * Service connection name: odm-platform.
+      * Check the option: Grant access permission to all pipelines.
+   4. Save. 
+
+## Run ODM Application Pipelines
+Return to the pipelines page. Now run the **odm-platform-application** pipeline.
+At the end of the execution, run the **odm-platform-executor-azdevops** pipeline.
+If there were no errors, you should be able to reach the following endpoints, replacing the [IP] placeholder with the hostname used in step 3:
 
 * ODM Platform Registry Module: http://[IP]:8001/api/v1/pp/registry/swagger-ui/index.html
 * ODM DevOps Module: http://[IP]:8002/api/v1/pp/devops/swagger-ui/index.html
 
-## Airline Data Product - Registration Phase ##
-
+# Airline Data Product - Registration Phase
 The next step is to register our Data Product in the ODM platform. Before doing so, let's input some configurations.
 
+## Configure the Data Product Lifecycle
 Open the **dp-demo-v1.0.0.json** file located in the **dp-demo-descriptor** folder and locate the following block:
 
 ```
@@ -185,6 +224,7 @@ Replace the following placeholders with the specific values from your Azure DevO
 * [pipelineID]: the ID of the specific pipeline; for the **provisionInfraDev** block, insert the ID of the **odm-demo-infrastructure** pipeline, and for the **deployAppDev** block, insert the ID of the **odm-demo-application** pipeline.
 * [IP]: enter the value used as the hostname in the configuration of the SSH service connection. [Go to ODM Platform deployment instructions section](####-ODM-Platform-deployment-instructions-####)
 
+## Register the Data Product
 We are now ready to register the Data Product in the ODM Platform. Open a terminal in the same folder as this README and execute the following commands, replacing the [IP] placeholder with the value used in the previous step.
 
 1. The first step is to create the Data Product by providing some basic information. Execute the following cURL command:
@@ -209,10 +249,10 @@ curl -X 'POST' \
 
 At this point, our Data Product has been registered in the ODM platform, and we can begin managing its lifecycle.
 
-## Airline Data Product - Deployment Phase ##
-
+# Airline Data Product - Deployment Phase
 Within the definition of the Airline Data Product (dp-demo-v1.0.0.json), you'll find, in the **Lifecycle** block, two main activities: **provisionInfraDev** and **deployAppDev**. The first one will deploy the necessary infrastructure for the Data Product, while the second will deploy the application that exposes the REST APIs on the newly created infrastructure.
 
+## Start Infrastructure Provisioning Activity
 Let's start with the **provisionInfraDev** activity:
 
 1. Register the activity:
@@ -243,7 +283,9 @@ At this point, if you go back to Azure DevOps, you should see the **odm-demo-inf
     * Service connection name: odm-demo-airline
     * Check the option: Grant access permission to all pipelines.
 
+## Start Application Deployment Activity
 Now let's move on to the second and last activity of our Data Product, **deployAppDev**:
+
 * Register the activity:
 
 ```
@@ -253,6 +295,7 @@ curl -X 'POST' \
   -H 'Content-Type: application/vnd.odmp.v1+json' \
   -d "@dp-demo-descriptor/dp-demo-v1.0.0-activity-2.json"
 ```
+
 * Start the activity:
 
 ```
@@ -263,7 +306,10 @@ curl -X 'PATCH' \
 
 At this point, if you go back to Azure DevOps, you should see the **odm-demo-application** pipeline running.
 
-Once the pipeline is finished, you have completed the provisioning of the Airline Data Product, and you can start querying the exposed interfaces. As described initially, the Data Product exposes two interfaces, a REST API, and a SQL one.
+Once the pipeline is finished, you have completed the provisioning of the Airline Data Product, and you can start querying the exposed interfaces. 
+
+# Test Data Product Interfaces
+As described initially, the Data Product exposes two interfaces, a REST API, and a SQL one.
 
 * The first one exposes a REST API that returns, for a specific airline, the most frequent routes. Remember to replace the [IP] placeholder here with the value used in the previous step:
 
@@ -298,9 +344,17 @@ You should receive a response similar to this:
 ]
 ```
 
+The second one exposes an SQL interface (MySQLDB), which you can query using JDBC drivers. To connect, you can use, for instance, [DBeaver Community](https://dbeaver.io/) and the following information:
+
+* DB Type: MySQL 8
+* Hostname: Find the value within the **mysql-endpoint** parameter returned in the output by the **odm-demo-infrastructure** pipeline in the **Terraform Apply** step.
+* Username: mysqladmin
+* Password: @1rl1n3D3m0!
+
+
 Congratulations! You have successfully deployed your first Data Product.
 
-## Housekeeping ##
+# Cleanup
 To delete all the resources created in this guide, navigate to the **infrastructure** folder and execute the following commands, replacing the placeholders with the values from the configuration used in this demo.
 
 Note: You'll need to log in to the Azure CLI, configuring the environment used for this demo.
@@ -319,7 +373,10 @@ terraform init -reconfigure -backend-config=storage_account_name=[storage_accoun
 terraform destroy
 ```
 
-## Who do I talk to? ##
+# Who do I talk to?
 
 * Giandomenico Avelluto
 * Quantyca S.p.A
+
+
+#TODO ristrutturare per aggiungere spiegazione della demo e staccare parte di deploy ODM
