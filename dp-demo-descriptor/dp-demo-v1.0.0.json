@@ -17,7 +17,7 @@
         },
         {
             "description": "This port expose all modifications in the status of each trip as events",
-            "$ref": "ports/dp-demo-v1.0.0-flight-freq-api-oport.json"
+            "$ref": "ports/dp-demo-v1.0.0-flight-freq-restapi-oport.json"
         }
       ]
    },
